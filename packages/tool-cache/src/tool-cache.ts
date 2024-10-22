@@ -694,6 +694,9 @@ function _completeToolPath(tool: string, version: string, arch?: string): void {
  * @param versionSpec      version string to check
  */
 export function isExplicitVersion(versionSpec: string): boolean {
+  core.info(' Toolkit Mahabaleshwars')
+  core.info('version spec' + versionSpec)
+  core.info('cleaned version spec' + semver.clean(versionSpec))
   const c = semver.clean(versionSpec) || ''
   core.debug(`isExplicit: ${c}`)
 
