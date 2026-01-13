@@ -22,13 +22,8 @@ export async function hashFiles(
   const githubWorkspace = options?.customWorkspace
     ? options.customWorkspace
     : currentWorkspace
-    ? currentWorkspace
-<<<<<<< HEAD
-    : process.env['GITHUB_WORKSPACE'] ?? process.cwd()
-
-=======
-    : (process.env['GITHUB_WORKSPACE'] ?? process.cwd())
->>>>>>> origin/main
+      ? currentWorkspace
+      : (process.env['GITHUB_WORKSPACE'] ?? process.cwd())
   const result = crypto.createHash('sha256')
   let count = 0
 
