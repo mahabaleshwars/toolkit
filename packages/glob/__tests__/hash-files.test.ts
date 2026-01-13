@@ -140,3 +140,88 @@ async function createSymlinkDir(real: string, link: string): Promise<void> {
     await fs.symlink(real, link)
   }
 }
+
+// ============ NEW TESTS FOR workingDirectory OPTION ============
+describe('hashFiles with workingDirectory', () => {
+  let tempDir: string
+  let actionDir: string
+  let workspaceDir: string
+  let originalWorkspace: string | undefined
+
+  beforeEach(async () => {
+    originalWorkspace = process.env.GITHUB_WORKSPACE
+
+    tempDir = path.join(getTestTemp(), 'working-directory-tests')
+    workspaceDir = path.join(tempDir, 'workspace')
+    actionDir = path.join(tempDir, 'actions', 'my-action')
+
+    await fs.mkdir(workspaceDir, {recursive: true})
+    await fs.mkdir(actionDir, {recursive: true})
+
+    process.env.GITHUB_WORKSPACE = workspaceDir
+
+    await fs.writeFile(
+      path.join(actionDir, 'requirements.txt'),
+      'pytest==7.4.0\nnumpy==1.24.0'
+    )
+    await fs.writeFile(
+      path.join(actionDir, 'package.json'),
+      '{"name": "test-action"}'
+    )
+  })
+
+  afterEach(async () => {
+    if (originalWorkspace !== undefined) {
+      process.env.GITHUB_WORKSPACE = originalWorkspace
+    } else {
+      delete process.env.GITHUB_WORKSPACE
+    }
+    await io.rmRF(tempDir)
+  })
+
+  it('ignores files outside workspace by default', async () => {
+    const hash = await hashFiles(path.join(actionDir, 'requirements.txt'))
+    expect(hash).toBe('')
+  })
+
+  it('hashes files from custom working directory', async () => {
+    // Use correct signature: patterns, currentWorkspace, options
+    const hash = await hashFiles('requirements.txt', '', {
+      workingDirectory: actionDir
+    })
+
+    expect(hash).toBeTruthy()
+    expect(hash).toHaveLength(64)
+  })
+
+  it('handles multiple patterns', async () => {
+    // Use correct signature: patterns, currentWorkspace, options
+    const hash = await hashFiles('requirements.txt\npackage.json', '', {
+      workingDirectory: actionDir
+    })
+
+    expect(hash).toBeTruthy()
+    expect(hash).toHaveLength(64)
+  })
+
+  it('returns consistent hash', async () => {
+    // Use correct signature: patterns, currentWorkspace, options
+    const hash1 = await hashFiles('requirements.txt', '', {
+      workingDirectory: actionDir
+    })
+    const hash2 = await hashFiles('requirements.txt', '', {
+      workingDirectory: actionDir
+    })
+
+    expect(hash1).toBe(hash2)
+  })
+
+  it('returns empty for missing files', async () => {
+    // Use correct signature: patterns, currentWorkspace, options
+    const hash = await hashFiles('non-existent.txt', '', {
+      workingDirectory: actionDir
+    })
+
+    expect(hash).toBe('')
+  })
+})
