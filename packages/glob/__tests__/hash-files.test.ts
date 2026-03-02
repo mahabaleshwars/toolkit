@@ -1,6 +1,8 @@
 import * as io from '../../io/src/io.js'
 import * as path from 'path'
+import * as crypto from 'crypto'
 import {hashFiles} from '../src/glob.js'
+import {hashFiles as internalHashFiles} from '../src/internal-hash-files.js'
 import {promises as fs} from 'fs'
 
 const IS_WINDOWS = process.platform === 'win32'
@@ -223,5 +225,32 @@ describe('hashFiles with workingDirectory', () => {
     })
 
     expect(hash).toBe('')
+  })
+
+  it('skips files that no longer exist during hashing', async () => {
+    const root = path.join(getTestTemp(), 'missing-during-hash')
+    await fs.mkdir(root, {recursive: true})
+
+    const existingFile = path.join(root, 'present.txt')
+    const missingFile = path.join(root, 'missing.txt')
+    const content = 'still here'
+
+    await fs.writeFile(existingFile, content)
+
+    const globber = {
+      async *globGenerator(): AsyncGenerator<string, void> {
+        yield missingFile
+        yield existingFile
+      }
+    }
+
+    const hash = await internalHashFiles(globber as any, root, false)
+
+    const expected = crypto.createHash('sha256')
+    const fileHash = crypto.createHash('sha256').update(content).digest()
+    expected.write(fileHash)
+    expected.end()
+
+    expect(hash).toBe(expected.digest('hex'))
   })
 })

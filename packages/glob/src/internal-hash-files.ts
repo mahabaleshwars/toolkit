@@ -44,6 +44,23 @@ export async function hashFiles(
     }
 
     // Existing hashing logic
+    let fileStats: fs.Stats
+    try {
+      fileStats = await fs.promises.stat(file)
+    } catch (error) {
+      const fsError = error as NodeJS.ErrnoException
+      if (fsError.code === 'ENOENT') {
+        writeDelegate(`Skip '${file}' since it no longer exists.`)
+        continue
+      }
+
+      throw error
+    }
+
+    if (!fileStats.isFile()) {
+      continue
+    }
+
     const hash = crypto.createHash('sha256')
     const pipeline = util.promisify(stream.pipeline)
     await pipeline(fs.createReadStream(file), hash)
