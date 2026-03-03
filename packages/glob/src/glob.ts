@@ -3,7 +3,7 @@ import {GlobOptions} from './internal-glob-options.js'
 import {HashFileOptions} from './internal-hash-file-options.js'
 import {hashFiles as _hashFiles} from './internal-hash-files.js'
 
-export {Globber, GlobOptions}
+export {Globber, GlobOptions, HashFileOptions}
 
 /**
  * Constructs a globber
@@ -19,23 +19,49 @@ export async function create(
 }
 
 /**
- * Computes the sha256 hash of a glob
+ * Computes the sha256 hash of a glob pattern
  *
  * @param patterns  Patterns separated by newlines
- * @param currentWorkspace  Workspace used when matching files
- * @param options   Glob options
+ * @param options   Glob and hash options
+ * @param currentWorkspace  Workspace for matching (deprecated, use options.workingDirectory)
  * @param verbose   Enables verbose logging
  */
 export async function hashFiles(
   patterns: string,
-  currentWorkspace = '',
-  options?: HashFileOptions,
-  verbose: Boolean = false
+  currentWorkspace?: string,
+  options?: HashFileOptions
 ): Promise<string> {
   let followSymbolicLinks = true
   if (options && typeof options.followSymbolicLinks === 'boolean') {
     followSymbolicLinks = options.followSymbolicLinks
   }
-  const globber = await create(patterns, {followSymbolicLinks})
-  return _hashFiles(globber, currentWorkspace, verbose)
+
+  // If workingDirectory is specified, use it to adjust patterns
+  const workingDir = options?.workingDirectory
+  let adjustedPatterns = patterns
+
+  if (workingDir) {
+    // Adjust patterns to be relative to working directory
+    const path = require('path')
+    adjustedPatterns = patterns
+      .split('\n')
+      .filter(p => p.trim())
+      .map(p => {
+        // If pattern is already absolute, use as-is
+        if (path.isAbsolute(p)) {
+          return p
+        }
+        // Otherwise, join with working directory
+        return path.join(workingDir, p)
+      })
+      .join('\n')
+  }
+
+  const globber = await create(adjustedPatterns, {followSymbolicLinks})
+
+  // Pass options to internal hash function
+  return _hashFiles(globber, currentWorkspace || '', false, {
+    allowOutsideWorkspace: !!workingDir,
+    customWorkspace: workingDir
+  })
 }
